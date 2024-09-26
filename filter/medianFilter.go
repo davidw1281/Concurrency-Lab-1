@@ -114,11 +114,23 @@ func filter(filepathIn, filepathOut string, threads int) {
 
 	immutableData := makeImmutableMatrix(getPixelData(img))
 	var newPixelData [][]uint8
-	
+
 	if threads == 1 {
 		newPixelData = medianFilter(0, height, 0, width, immutableData)
 	} else {
-		panic("TODO Implement me")
+		channels := make([]chan [][]uint8, threads)
+		for i := range channels {
+			channels[i] = make(chan [][]uint8)
+		}
+
+		for i := 0; i < threads; i++ {
+			go worker(int(float32(height)*(float32(i)/float32(threads))), int(float32(height)*(float32(i+1))/float32(threads)), 0, width, immutableData, channels[i])
+		}
+
+		for i := 0; i < threads; i++ {
+			slice := <-channels[i]
+			newPixelData = append(newPixelData, slice...)
+		}
 	}
 
 	imout := image.NewGray(image.Rect(0, 0, width, height))
@@ -127,6 +139,11 @@ func filter(filepathIn, filepathOut string, threads int) {
 	defer ofp.Close()
 	err := png.Encode(ofp, imout)
 	check(err)
+}
+
+func worker(startY, endY, startX, endX int, data func(y, x int) uint8, channel chan [][]uint8) {
+	newSlice := medianFilter(startY, endY, startX, endX, data)
+	channel <- newSlice
 }
 
 // main reads in the filepath flags or sets them to default values and calls filter().
@@ -150,7 +167,7 @@ func main() {
 	flag.IntVar(
 		&threads,
 		"threads",
-		1,
+		16,
 		"Specify the number of worker threads to use.")
 
 	flag.Parse()
