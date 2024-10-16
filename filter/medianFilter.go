@@ -123,10 +123,12 @@ func filter(filepathIn, filepathOut string, threads int) {
 			channels[i] = make(chan [][]uint8)
 		}
 
+		workerHeight := height / threads
 		for i := 0; i < threads; i++ {
-			go worker(int(float32(height)*(float32(i)/float32(threads))), int(float32(height)*(float32(i+1))/float32(threads)), 0, width, immutableData, channels[i])
+			go worker(i*workerHeight, (i+1)*workerHeight, 0, width, immutableData, channels[i])
 		}
 
+		newPixelData = makeMatrix(0, 0)
 		for i := 0; i < threads; i++ {
 			slice := <-channels[i]
 			newPixelData = append(newPixelData, slice...)
